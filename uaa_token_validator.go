@@ -95,6 +95,10 @@ func NewUAAClientFromAPIURL(apiEndpoint string) (*UAAClient, error) {
 	return &UAAClient{UAAURL: uaaURL}, nil
 }
 
+func (lh *UAAClient) GetAuthorizeEndpoint() string {
+	return lh.UAAURL + "/oauth/authorize"
+}
+
 // ExchangeBearerTokenForClientToken takes a bearer token (such as that returned by CF), and exchanges via
 // the API auth flow, for an OAuthGrant for the specified clientID. The clientSecret here is really not a secret.
 func (lh *UAAClient) ExchangeBearerTokenForClientToken(clientID, clientSecret, bearerLine string) (*UAAOAuthGrant, error) {
