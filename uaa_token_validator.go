@@ -25,7 +25,7 @@ type UAAOAuthGrant struct {
 // FetchAccessToken sends data to endpoint to fetch a token
 // Return grant object.
 func (lh *UAAClient) FetchAccessToken(clientID, clientSecret string, postData url.Values) (*UAAOAuthGrant, error) {
-	req, err := http.NewRequest(http.MethodPost, lh.UAAURL+"/oauth/token", bytes.NewReader([]byte(postData.Encode())))
+	req, err := http.NewRequest(http.MethodPost, lh.GetTokenEndpoint(), bytes.NewReader([]byte(postData.Encode())))
 	if err != nil {
 		return nil, err
 	}
@@ -99,10 +99,14 @@ func (lh *UAAClient) GetAuthorizeEndpoint() string {
 	return lh.UAAURL + "/oauth/authorize"
 }
 
+func (lh *UAAClient) GetTokenEndpoint() string {
+	return lh.UAAURL + "/oauth/token"
+}
+
 // ExchangeBearerTokenForClientToken takes a bearer token (such as that returned by CF), and exchanges via
 // the API auth flow, for an OAuthGrant for the specified clientID. The clientSecret here is really not a secret.
 func (lh *UAAClient) ExchangeBearerTokenForClientToken(clientID, clientSecret, bearerLine string) (*UAAOAuthGrant, error) {
-	req, err := http.NewRequest(http.MethodPost, lh.UAAURL+"/oauth/authorize", bytes.NewReader([]byte(url.Values(map[string][]string{
+	req, err := http.NewRequest(http.MethodPost, lh.GetAuthorizeEndpoint(), bytes.NewReader([]byte(url.Values(map[string][]string{
 		"client_id":     {clientID},
 		"response_type": {"code"},
 	}).Encode())))
