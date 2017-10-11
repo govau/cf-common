@@ -3,7 +3,9 @@ package cfcommon
 import (
 	"fmt"
 	"log"
+	"os"
 	"strconv"
+	"strings"
 
 	cfenv "github.com/cloudfoundry-community/go-cfenv"
 )
@@ -59,6 +61,25 @@ func (el *EnvVars) load(key string) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+// NewDefaultEnvLookup will detect if running in a CloudFoundry app,
+// and if so will look for an env variable named UPS_PATH which if specified,
+// must be a ":" separated list of user-provided-services that will be searched
+// in that order. If any are missing, a warning is printed, but no error occurs.
+// In any case, env variables are always sourced from your local environment
+// variables first.
+func NewDefaultEnvLookup() *EnvVars {
+	lookupPath := []EnvLookup{os.LookupEnv}
+
+	app, err := cfenv.Current()
+	if err == nil {
+		for _, name := range strings.Split(os.Getenv("UPS_PATH"), ":") {
+			lookupPath = append(lookupPath, NewEnvLookupFromCFAppNamedService(app, name))
+		}
+	}
+
+	return NewEnvVarsFromPath(lookupPath...)
 }
 
 // NewEnvVarsFromPath create an EnvVars object, where the elements in the path
