@@ -1,6 +1,7 @@
 package cfcommon
 
 import (
+	"encoding/hex"
 	"fmt"
 	"log"
 	"os"
@@ -31,6 +32,22 @@ func (el *EnvVars) MustString(key string) string {
 		panic(&ErrMissingEnvVar{Name: key})
 	}
 	return rv
+}
+
+// MustHexEncodedByteArray will panic if value is not a hex-encoded by array of given length, else return it
+func (el *EnvVars) MustHexEncodedByteArray(key string, decodedByteLength int) []byte {
+	rv, found := el.load(key)
+	if !found {
+		panic(&ErrMissingEnvVar{Name: key})
+	}
+	byteRv, err := hex.DecodeString(rv)
+	if err != nil {
+		panic(&ErrMissingEnvVar{Name: key})
+	}
+	if len(byteRv) != decodedByteLength {
+		panic(&ErrMissingEnvVar{Name: key})
+	}
+	return byteRv
 }
 
 // Bool looks for the key, and if found, parses it using strconv.ParseBool and returns
