@@ -60,7 +60,7 @@ type oauthToken struct {
 	Expiry      int64  `json:"expires_in"`
 }
 
-func (ch *Client) MakeRequest(path string, params url.Values, rv interface{}) error {
+func (ch *Client) updateToken() error {
 	if ch.token == nil || time.Unix(ch.token.Expiry, 0).Before(time.Now().Add(5*time.Minute)) {
 		r, err := http.NewRequest(http.MethodPost, ch.UAAURL+"/oauth/token", bytes.NewReader([]byte((&url.Values{
 			"client_id":     {ch.ClientID},
@@ -96,7 +96,34 @@ func (ch *Client) MakeRequest(path string, params url.Values, rv interface{}) er
 		ch.token = &at
 	}
 
+	return nil
+}
+
+func (ch *Client) MakeRequest(path string, params url.Values, rv interface{}) error {
 	req, err := http.NewRequest(http.MethodGet, ch.CredHubURL+path+"?"+params.Encode(), nil)
+	if err != nil {
+		return err
+	}
+
+	return ch.rawMakeRequest(req, rv)
+}
+
+func (ch *Client) PutRequest(path string, val, rv interface{}) error {
+	data, err := json.Marshal(val)
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, ch.CredHubURL+path, bytes.NewReader(data))
+	if err != nil {
+		return err
+	}
+
+	return ch.rawMakeRequest(req, rv)
+}
+
+func (ch *Client) rawMakeRequest(req *http.Request, rv interface{}) error {
+	err := ch.updateToken()
 	if err != nil {
 		return err
 	}
