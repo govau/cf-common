@@ -24,7 +24,7 @@ type OAuthGrant struct {
 
 // FetchAccessToken sends data to endpoint to fetch a token and returns a grant
 // object.
-func (c *Client) FetchAccessToken(clientID, clientSecret string, postData url.Values) (*OAuthGrant, error) {
+func (c *Client) FetchAccessToken(postData url.Values) (*OAuthGrant, error) {
 	req, err := http.NewRequest(http.MethodPost, c.GetTokenEndpoint(), bytes.NewReader([]byte(postData.Encode())))
 	if err != nil {
 		return nil, err
@@ -32,7 +32,7 @@ func (c *Client) FetchAccessToken(clientID, clientSecret string, postData url.Va
 	// Older versions of CF require this to be set via header, not in POST data
 	// WONTFIX: we query escape these per OAuth spec. Apparently UAA does not -
 	// might cause an issue if they don't fix their end.
-	req.SetBasicAuth(url.QueryEscape(clientID), url.QueryEscape(clientSecret))
+	req.SetBasicAuth(url.QueryEscape(c.ClientID), url.QueryEscape(c.ClientSecret))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	resp, err := http.DefaultClient.Do(req)
@@ -59,6 +59,9 @@ func (c *Client) FetchAccessToken(clientID, clientSecret string, postData url.Va
 type Client struct {
 	// URL is the URL to UAA, e.g. https://uaa.system.example.com.
 	URL string
+
+	ClientID     string
+	ClientSecret string
 
 	// cachedKeysMu protects cachedKeys.
 	cachedKeysMu sync.RWMutex
@@ -106,9 +109,9 @@ func (c *Client) GetTokenEndpoint() string {
 // ExchangeBearerTokenForClientToken takes a bearer token (such as that returned
 // by CF), and exchanges via the API auth flow, for an OAuthGrant for the
 // specified clientID. The clientSecret here is really not a secret.
-func (c *Client) ExchangeBearerTokenForClientToken(clientID, clientSecret, bearerLine string) (*OAuthGrant, error) {
+func (c *Client) ExchangeBearerTokenForClientToken(bearerLine string) (*OAuthGrant, error) {
 	req, err := http.NewRequest(http.MethodPost, c.GetAuthorizeEndpoint(), bytes.NewReader([]byte(url.Values{
-		"client_id":     {clientID},
+		"client_id":     {c.ClientID},
 		"response_type": {"code"},
 	}.Encode())))
 	if err != nil {
@@ -139,7 +142,7 @@ func (c *Client) ExchangeBearerTokenForClientToken(clientID, clientSecret, beare
 		return nil, errors.New("expected auth code back from UAA")
 	}
 
-	return c.FetchAccessToken(clientID, clientSecret, url.Values(map[string][]string{
+	return c.FetchAccessToken(url.Values(map[string][]string{
 		"response_type": {"token"},
 		"grant_type":    {"authorization_code"},
 		"code":          {authCode},
