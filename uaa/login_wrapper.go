@@ -78,6 +78,9 @@ type LoginHandler struct {
 	// BaseURL of ourselves for redirect URIs
 	BaseURL string
 
+	// ExternalURL for UAA
+	ExternalUAAURL string
+
 	// Written if access is denied
 	DeniedContent []byte
 
@@ -191,7 +194,7 @@ func (lh *LoginHandler) Wrap(h http.Handler) http.Handler {
 				// should we log out of CF as well?
 				redirect := lh.BaseURL
 				if r.FormValue("cf") == "1" {
-					redirect = fmt.Sprintf("%s/logout.do?redirect=%s", lh.UAA, url.QueryEscape(redirect))
+					redirect = fmt.Sprintf("%s/logout.do?redirect=%s", lh.ExternalUAAURL, url.QueryEscape(redirect))
 				}
 
 				// go back to home

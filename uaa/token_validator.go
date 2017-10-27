@@ -3,6 +3,8 @@ package uaa
 import (
 	"bytes"
 	"crypto/rsa"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -25,6 +27,11 @@ type OAuthGrant struct {
 // FetchAccessToken sends data to endpoint to fetch a token and returns a grant
 // object.
 func (c *Client) FetchAccessToken(postData url.Values) (*OAuthGrant, error) {
+	err := c.init()
+	if err != nil {
+		return nil, err
+	}
+
 	req, err := http.NewRequest(http.MethodPost, c.GetTokenEndpoint(), bytes.NewReader([]byte(postData.Encode())))
 	if err != nil {
 		return nil, err
@@ -35,7 +42,7 @@ func (c *Client) FetchAccessToken(postData url.Values) (*OAuthGrant, error) {
 	req.SetBasicAuth(url.QueryEscape(c.ClientID), url.QueryEscape(c.ClientSecret))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := c.uaaHTTPClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -63,11 +70,45 @@ type Client struct {
 	ClientID     string
 	ClientSecret string
 
+	// If specified, used in instead of system CAs
+	CACerts []string
+
 	// cachedKeysMu protects cachedKeys.
 	cachedKeysMu sync.RWMutex
 
 	// cachedKeys is the public key map.
 	cachedKeys map[string]*rsa.PublicKey
+
+	initMutex     sync.Mutex
+	inited        bool
+	uaaHTTPClient *http.Client
+}
+
+func (c *Client) init() error {
+	c.initMutex.Lock()
+	defer c.initMutex.Unlock()
+
+	if c.inited {
+		return nil
+	}
+
+	if len(c.CACerts) == 0 {
+		c.uaaHTTPClient = http.DefaultClient
+	} else {
+		uaaCaCertPool := x509.NewCertPool()
+		for _, ca := range c.CACerts {
+			ok := uaaCaCertPool.AppendCertsFromPEM([]byte(ca))
+			if !ok {
+				return errors.New("AppendCertsFromPEM was not ok")
+			}
+		}
+		uaaTLS := &tls.Config{RootCAs: uaaCaCertPool}
+		uaaTLS.BuildNameToCertificate()
+		c.uaaHTTPClient = &http.Client{Transport: &http.Transport{TLSClientConfig: uaaTLS}}
+	}
+
+	c.inited = true
+	return nil
 }
 
 // NewClientFromAPIURL looks up, via the apiEndpoint, the correct UAA address
@@ -110,6 +151,11 @@ func (c *Client) GetTokenEndpoint() string {
 // by CF), and exchanges via the API auth flow, for an OAuthGrant for the
 // specified clientID. The clientSecret here is really not a secret.
 func (c *Client) ExchangeBearerTokenForClientToken(bearerLine string) (*OAuthGrant, error) {
+	err := c.init()
+	if err != nil {
+		return nil, err
+	}
+
 	req, err := http.NewRequest(http.MethodPost, c.GetAuthorizeEndpoint(), bytes.NewReader([]byte(url.Values{
 		"client_id":     {c.ClientID},
 		"response_type": {"code"},
@@ -125,6 +171,10 @@ func (c *Client) ExchangeBearerTokenForClientToken(bearerLine string) (*OAuthGra
 			return http.ErrUseLastResponse
 		},
 	}
+	if c.uaaHTTPClient != nil {
+		hc.Transport = c.uaaHTTPClient.Transport
+	}
+
 	resp, err := hc.Do(req)
 	if err != nil {
 		return nil, err
@@ -170,7 +220,12 @@ func (c *Client) pubKeyForID(kid string) *rsa.PublicKey {
 // fetchAndSaveLatestKey contacts UAA to fetch latest public key, and if it
 // matches the key ID requested, then return it, else an error will be returned.
 func (c *Client) fetchAndSaveLatestKey(idWanted string) (*rsa.PublicKey, error) {
-	resp, err := http.Get(c.URL + "/token_key")
+	err := c.init()
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.uaaHTTPClient.Get(c.URL + "/token_key")
 	if err != nil {
 		return nil, err
 	}
