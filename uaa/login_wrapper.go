@@ -24,7 +24,7 @@ type ctxKey int
 
 const (
 	// We set this value in a context for wrapped requests
-	keyLoggedInUser ctxKey = iota
+	KeyLoggedInUser ctxKey = iota
 )
 
 // This value is set for handlers to be able to use
@@ -153,7 +153,7 @@ func (lh *LoginHandler) Wrap(h http.Handler) http.Handler {
 
 			// Finally, we are good to go.
 			// Add our logged in user to the request object passed to the child
-			h.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), keyLoggedInUser, &LoggedInUser{
+			h.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), KeyLoggedInUser, &LoggedInUser{
 				EmailAddress: emailAddr,
 				AccessToken:  accessToken,
 			})))
@@ -296,7 +296,7 @@ func (lh *LoginHandler) Wrap(h http.Handler) http.Handler {
 			// Finally, we are good to go.
 			if liu.EmailAddress != "" {
 				// Add our logged in user to the request object passed to the child
-				h.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), keyLoggedInUser, liu)))
+				h.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), KeyLoggedInUser, liu)))
 				return
 			}
 
