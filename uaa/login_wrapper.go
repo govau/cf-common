@@ -312,7 +312,7 @@ func (lh *LoginHandler) Wrap(h http.Handler) http.Handler {
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
-			http.Redirect(w, r, lh.UAA.URL+"/oauth/authorize?"+(&url.Values{
+			http.Redirect(w, r, lh.ExternalUAAURL+"/oauth/authorize?"+(&url.Values{
 				"client_id":     {lh.UAA.ClientID},
 				"response_type": {"code"},
 				"state":         {osd.State},
