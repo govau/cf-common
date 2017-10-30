@@ -128,7 +128,7 @@ func (ch *Client) PutRequest(path string, val, rv interface{}) error {
 	return ch.rawMakeRequest(req, rv)
 }
 
-func (ch *Client) DeleteRequest(path string, params url.Values, rv interface{}) error {
+func (ch *Client) DeleteRequest(path string, params url.Values) error {
 	req, err := http.NewRequest(http.MethodDelete, ch.CredHubURL+path+"?"+params.Encode(), nil)
 	if err != nil {
 		return err
@@ -136,7 +136,7 @@ func (ch *Client) DeleteRequest(path string, params url.Values, rv interface{}) 
 
 	req.Header.Set("Content-Type", "application/json")
 
-	return ch.rawMakeRequest(req, rv)
+	return ch.rawMakeRequest(req, nil)
 }
 
 func (ch *Client) rawMakeRequest(req *http.Request, rv interface{}) error {
@@ -160,6 +160,8 @@ func (ch *Client) rawMakeRequest(req *http.Request, rv interface{}) error {
 	switch resp.StatusCode {
 	case http.StatusOK:
 		return json.Unmarshal(contents, rv)
+	case http.StatusResetContent:
+		return nil // expected for deleted
 	case http.StatusNotFound:
 		return ErrCredNotFound
 	default:
