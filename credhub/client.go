@@ -128,6 +128,17 @@ func (ch *Client) PutRequest(path string, val, rv interface{}) error {
 	return ch.rawMakeRequest(req, rv)
 }
 
+func (ch *Client) DeleteRequest(path string, params url.Values, rv interface{}) error {
+	req, err := http.NewRequest(http.MethodDelete, ch.CredHubURL+path+"?"+params.Encode(), nil)
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	return ch.rawMakeRequest(req, rv)
+}
+
 func (ch *Client) rawMakeRequest(req *http.Request, rv interface{}) error {
 	err := ch.updateToken()
 	if err != nil {
