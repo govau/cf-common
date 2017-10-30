@@ -160,7 +160,7 @@ func (ch *Client) rawMakeRequest(req *http.Request, rv interface{}) error {
 	switch resp.StatusCode {
 	case http.StatusOK:
 		return json.Unmarshal(contents, rv)
-	case http.StatusResetContent:
+	case http.StatusNoContent:
 		return nil // expected for deleted
 	case http.StatusNotFound:
 		return ErrCredNotFound
