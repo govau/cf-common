@@ -27,8 +27,21 @@ type Client struct {
 }
 
 var (
-	ErrCredNotFound = errors.New("not found in credhub")
+	errCredNotFound = errors.New("not found in credhub")
 )
+
+type credHubErr struct {
+	error
+}
+
+func IsCommsRelatedError(err error) bool {
+	_, ok := err.(credHubErr)
+	return ok
+}
+
+func IsNotFoundError(err error) bool {
+	return err == errCredNotFound
+}
 
 func (c *Client) Init() error {
 	uaaCaCertPool := x509.NewCertPool()
@@ -73,19 +86,19 @@ func (ch *Client) updateToken() error {
 			"response_type": {"token"},
 		}).Encode())))
 		if err != nil {
-			return err
+			return credHubErr{err}
 		}
 		r.Header.Set("Accept", "application/json")
 		r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 		resp, err := ch.uaaClient.Do(r)
 		if err != nil {
-			return err
+			return credHubErr{err}
 		}
 		data, err := ioutil.ReadAll(resp.Body)
 		resp.Body.Close()
 		if err != nil {
-			return err
+			return credHubErr{err}
 		}
 		if resp.StatusCode != http.StatusOK {
 			return fmt.Errorf("not OK response from UAA: %s", data)
@@ -106,7 +119,7 @@ func (ch *Client) updateToken() error {
 func (ch *Client) MakeRequest(path string, params url.Values, rv interface{}) error {
 	req, err := http.NewRequest(http.MethodGet, ch.CredHubURL+path+"?"+params.Encode(), nil)
 	if err != nil {
-		return err
+		return credHubErr{err}
 	}
 
 	return ch.rawMakeRequest(req, rv)
@@ -120,7 +133,7 @@ func (ch *Client) PutRequest(path string, val, rv interface{}) error {
 
 	req, err := http.NewRequest(http.MethodPut, ch.CredHubURL+path, bytes.NewReader(data))
 	if err != nil {
-		return err
+		return credHubErr{err}
 	}
 
 	req.Header.Set("Content-Type", "application/json")
@@ -131,7 +144,7 @@ func (ch *Client) PutRequest(path string, val, rv interface{}) error {
 func (ch *Client) DeleteRequest(path string, params url.Values) error {
 	req, err := http.NewRequest(http.MethodDelete, ch.CredHubURL+path+"?"+params.Encode(), nil)
 	if err != nil {
-		return err
+		return credHubErr{err}
 	}
 
 	req.Header.Set("Content-Type", "application/json")
@@ -149,12 +162,12 @@ func (ch *Client) rawMakeRequest(req *http.Request, rv interface{}) error {
 
 	resp, err := ch.credHubClient.Do(req)
 	if err != nil {
-		return err
+		return credHubErr{err}
 	}
 	contents, err := ioutil.ReadAll(resp.Body)
 	resp.Body.Close()
 	if err != nil {
-		return err
+		return credHubErr{err}
 	}
 
 	switch resp.StatusCode {
@@ -163,7 +176,7 @@ func (ch *Client) rawMakeRequest(req *http.Request, rv interface{}) error {
 	case http.StatusNoContent:
 		return nil // expected for deleted
 	case http.StatusNotFound:
-		return ErrCredNotFound
+		return errCredNotFound
 	default:
 		return fmt.Errorf("not OK response from CredHub: %s", contents)
 	}
