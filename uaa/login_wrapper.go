@@ -78,9 +78,6 @@ type LoginHandler struct {
 	// BaseURL of ourselves for redirect URIs
 	BaseURL string
 
-	// BaseURLFunc (if set) is used in favour of BaseURL to calculate the URL needed
-	BaseURLFunc func(r *http.Request) (string, error)
-
 	// ExternalURL for UAA
 	ExternalUAAURL string
 
@@ -130,13 +127,6 @@ func (lh *LoginHandler) fetchAndValidateToken(postData url.Values) (string, *OAu
 	}
 
 	return emailAddr, og, nil
-}
-
-func (lh *LoginHandler) baseURLForReq(r *http.Request) (string, error) {
-	if lh.BaseURLFunc == nil {
-		return lh.BaseURL, nil
-	}
-	return lh.BaseURLFunc(r)
 }
 
 // Wrap child handler, handle OAuth for us, call child handler once logged in
@@ -208,11 +198,7 @@ func (lh *LoginHandler) Wrap(h http.Handler) http.Handler {
 				osdRaw.Save(r, w)
 
 				// should we log out of CF as well?
-				redirect, err := lh.baseURLForReq(r)
-				if err != nil {
-					w.WriteHeader(http.StatusBadRequest)
-					return
-				}
+				redirect := lh.BaseURL
 				if r.FormValue("cf") == "1" {
 					redirect = fmt.Sprintf("%s/logout.do?redirect=%s", lh.ExternalUAAURL, url.QueryEscape(redirect))
 				}
@@ -225,17 +211,12 @@ func (lh *LoginHandler) Wrap(h http.Handler) http.Handler {
 			// Check if this is the OAuth callback
 			if r.URL.Path == "/oauth2callback" {
 				if len(osd.State) > 0 && osd.State == r.FormValue("state") {
-					baseURL, err := lh.baseURLForReq(r)
-					if err != nil {
-						w.WriteHeader(http.StatusBadRequest)
-						return
-					}
 					emailAddress, og, err := lh.fetchAndValidateToken(url.Values{
 						"response_type": {"token"},
 						"code":          {r.FormValue("code")},
 						"grant_type":    {"authorization_code"},
 						"scope":         {strings.Join(lh.Scopes, " ")},
-						"redirect_uri":  {baseURL + "/oauth2callback"},
+						"redirect_uri":  {lh.BaseURL + "/oauth2callback"},
 					})
 					if err != nil {
 						if lh.Logger != nil {
@@ -373,17 +354,12 @@ func (lh *LoginHandler) Wrap(h http.Handler) http.Handler {
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
-			baseURL, err := lh.baseURLForReq(r)
-			if err != nil {
-				w.WriteHeader(http.StatusBadRequest)
-				return
-			}
 			http.Redirect(w, r, lh.ExternalUAAURL+"/oauth/authorize?"+(&url.Values{
 				"client_id":     {lh.UAA.ClientID},
 				"response_type": {"code"},
 				"state":         {osd.State},
 				"scope":         {strings.Join(lh.Scopes, " ")},
-				"redirect_uri":  {baseURL + "/oauth2callback"},
+				"redirect_uri":  {lh.BaseURL + "/oauth2callback"},
 			}).Encode(), http.StatusFound)
 		}
 	})
