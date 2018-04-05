@@ -1,0 +1,28 @@
+[[constraint]]
+  name = "github.com/bgentry/que-go"
+  source = "github.com/govau/que-go"
+  branch = "fixshutdown"
+
+[[constraint]]
+  name = "github.com/cloudfoundry-community/go-cfenv"
+  version = "1.17.0"
+
+[[constraint]]
+  name = "github.com/dgrijalva/jwt-go"
+  version = "3.2.0"
+
+[[constraint]]
+  name = "github.com/gorilla/securecookie"
+  version = "1.1.1"
+
+[[constraint]]
+  name = "github.com/gorilla/sessions"
+  version = "1.1.0"
+
+[[constraint]]
+  name = "github.com/jackc/pgx"
+  version = "3.1.0"
+
+[prune]
+  go-tests = true
+  unused-packages = true
