@@ -153,12 +153,6 @@ func (h *Handler) WorkForever() error {
 	}
 
 	qc := que.NewClient(pgxPool)
-	if h.OnStart != nil {
-		err = h.OnStart(qc, pgxPool, h.Logger)
-		if err != nil {
-			return err
-		}
-	}
 
 	workerMap := make(que.WorkMap)
 	for k, v := range h.WorkerMap {
@@ -187,6 +181,13 @@ func (h *Handler) WorkForever() error {
 		log.Println("Shutdown complete")
 		os.Exit(0)
 	}()
+
+	if h.OnStart != nil {
+		err = h.OnStart(qc, pgxPool, h.Logger)
+		if err != nil {
+			return err
+		}
+	}
 
 	workers.Start()
 	return nil
