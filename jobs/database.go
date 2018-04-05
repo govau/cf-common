@@ -108,8 +108,9 @@ type Handler struct {
 	PGXConnConfig *pgx.ConnConfig
 	InitSQL       string
 	WorkerCount   int
-	WorkerMap     que.WorkMap
+	WorkerMap     map[string]*JobConfig
 	BootstrapJob  *que.Job
+	Logger        *log.Logger
 }
 
 func (h *Handler) enqueueBootstrap(qc *que.Client, pgxConn *pgx.ConnPool) error {
@@ -172,7 +173,12 @@ func (h *Handler) Run() error {
 		return err
 	}
 
-	workers := que.NewWorkerPool(qc, h.WorkerMap, h.WorkerCount)
+	workerMap := make(que.WorkMap)
+	for k, v := range h.WorkerMap {
+		workerMap[k] = v.CloneWith(qc, h.Logger).Run
+	}
+
+	workers := que.NewWorkerPool(qc, workerMap, h.WorkerCount)
 
 	// Prepare a shutdown function
 	shutdown := func() {
