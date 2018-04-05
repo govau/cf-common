@@ -3,7 +3,11 @@ package jobs
 import (
 	"errors"
 	"fmt"
+	"log"
+	"os"
+	"os/signal"
 	"sync"
+	"syscall"
 
 	cfenv "github.com/cloudfoundry-community/go-cfenv"
 
@@ -12,7 +16,16 @@ import (
 )
 
 // Return a database object, using the CloudFoundry environment data
-func postgresCredsFromCF() (map[string]interface{}, error) {
+func MustPGXConfigFromCloudFoundry() *pgx.ConnConfig {
+	rv, err := PGXConfigFromCloudFoundry()
+	if err != nil {
+		log.Fatal(err)
+	}
+	return rv
+}
+
+// Return a database object, using the CloudFoundry environment data
+func PGXConfigFromCloudFoundry() (*pgx.ConnConfig, error) {
 	appEnv, err := cfenv.Current()
 	if err != nil {
 		return nil, err
@@ -27,7 +40,14 @@ func postgresCredsFromCF() (map[string]interface{}, error) {
 		return nil, errors.New("expecting 1 database")
 	}
 
-	return dbEnv[0].Credentials, nil
+	creds := dbEnv[0].Credentials
+	return &pgx.ConnConfig{
+		Database: creds["name"].(string),
+		User:     creds["username"].(string),
+		Password: creds["password"].(string),
+		Host:     creds["host"].(string),
+		Port:     uint16(creds["port"].(float64)),
+	}, nil
 }
 
 type dbInitter struct {
@@ -84,21 +104,37 @@ func (dbi *dbInitter) AfterConnect(c *pgx.Conn) error {
 	return nil
 }
 
-func GetPGXPool(maxConns int, databaseInit string) (*pgx.ConnPool, error) {
-	creds, err := postgresCredsFromCF()
-	if err != nil {
-		return nil, err
+type Handler struct {
+	PGXConnConfig *pgx.ConnConfig
+	InitSQL       string
+	WorkerCount   int
+	WorkerMap     que.WorkMap
+	BootstrapJob  *que.Job
+}
+
+func (h *Handler) enqueueBootstrap(qc *que.Client, pgxConn *pgx.ConnPool) error {
+	if h.BootstrapJob == nil {
+		return nil
 	}
 
-	return pgx.NewConnPool(pgx.ConnPoolConfig{
-		MaxConnections: maxConns,
-		ConnConfig: pgx.ConnConfig{
-			Database: creds["name"].(string),
-			User:     creds["username"].(string),
-			Password: creds["password"].(string),
-			Host:     creds["host"].(string),
-			Port:     uint16(creds["port"].(float64)),
-		},
+	tx, err := pgxConn.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	err = qc.EnqueueInTx(h.BootstrapJob, tx)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
+func (h *Handler) Run() error {
+	pgxPool, err := pgx.NewConnPool(pgx.ConnPoolConfig{
+		MaxConnections: h.WorkerCount * 2,
+		ConnConfig:     *h.PGXConnConfig,
 		AfterConnect: (&dbInitter{
 			InitSQL: fmt.Sprintf(`
 				CREATE TABLE IF NOT EXISTS que_jobs (
@@ -114,8 +150,6 @@ func GetPGXPool(maxConns int, databaseInit string) (*pgx.ConnPool, error) {
 					CONSTRAINT que_jobs_pkey PRIMARY KEY (queue, priority, run_at, job_id)
 				);
 
-				COMMENT ON TABLE que_jobs IS '3';
-
 				CREATE TABLE IF NOT EXISTS cron_metadata (
 					id             text                     PRIMARY KEY,
 					last_completed timestamp with time zone NOT NULL DEFAULT TIMESTAMP 'EPOCH',
@@ -123,9 +157,44 @@ func GetPGXPool(maxConns int, databaseInit string) (*pgx.ConnPool, error) {
 				);
 
 				%s
-				`, databaseInit),
+				`, h.InitSQL),
 			OtherStatements:    que.PrepareStatements,
 			PreparedStatements: map[string]string{},
 		}).AfterConnect,
 	})
+	if err != nil {
+		return err
+	}
+
+	qc := que.NewClient(pgxPool)
+	err = h.enqueueBootstrap(qc, pgxPool)
+	if err != nil {
+		return err
+	}
+
+	workers := que.NewWorkerPool(qc, h.WorkerMap, h.WorkerCount)
+
+	// Prepare a shutdown function
+	shutdown := func() {
+		workers.Shutdown()
+		pgxPool.Close()
+	}
+
+	// Normal exit
+	defer shutdown()
+
+	// Or via signals
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, os.Interrupt)
+	signal.Notify(sigCh, syscall.SIGTERM)
+	go func() {
+		sig := <-sigCh
+		log.Printf("Received %v, starting shutdown...", sig)
+		shutdown()
+		log.Println("Shutdown complete")
+		os.Exit(0)
+	}()
+
+	workers.Start()
+	return nil
 }
