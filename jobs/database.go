@@ -109,30 +109,15 @@ type Handler struct {
 	InitSQL       string
 	WorkerCount   int
 	WorkerMap     map[string]*JobConfig
-	BootstrapJob  *que.Job
+	OnStart       func(qc *que.Client, pgxPool *pgx.ConnPool, logger *log.Logger) error
 	Logger        *log.Logger
 }
 
-func (h *Handler) enqueueBootstrap(qc *que.Client, pgxConn *pgx.ConnPool) error {
-	if h.BootstrapJob == nil {
-		return nil
+func (h *Handler) WorkForever() error {
+	if h.Logger == nil {
+		h.Logger = log.New(os.Stderr, "", log.LstdFlags)
 	}
 
-	tx, err := pgxConn.Begin()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	err = qc.EnqueueInTx(h.BootstrapJob, tx)
-	if err != nil {
-		return err
-	}
-
-	return tx.Commit()
-}
-
-func (h *Handler) Run() error {
 	pgxPool, err := pgx.NewConnPool(pgx.ConnPoolConfig{
 		MaxConnections: h.WorkerCount * 2,
 		ConnConfig:     *h.PGXConnConfig,
@@ -168,9 +153,11 @@ func (h *Handler) Run() error {
 	}
 
 	qc := que.NewClient(pgxPool)
-	err = h.enqueueBootstrap(qc, pgxPool)
-	if err != nil {
-		return err
+	if h.OnStart != nil {
+		err = h.OnStart(qc, pgxPool, h.Logger)
+		if err != nil {
+			return err
+		}
 	}
 
 	workerMap := make(que.WorkMap)
