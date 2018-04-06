@@ -28,6 +28,9 @@ type JobConfig struct {
 
 	F JobFunc
 
+	// Debug logging
+	VerboseLogging bool
+
 	// One will only be called at once
 	Singleton bool
 
@@ -37,11 +40,12 @@ type JobConfig struct {
 
 func (scw *JobConfig) CloneWith(qc *que.Client, logger *log.Logger) *JobConfig {
 	return &JobConfig{
-		qc:        qc,
-		logger:    logger,
-		F:         scw.F,
-		Singleton: scw.Singleton,
-		Duration:  scw.Duration,
+		qc:             qc,
+		logger:         logger,
+		F:              scw.F,
+		Singleton:      scw.Singleton,
+		VerboseLogging: scw.VerboseLogging,
+		Duration:       scw.Duration,
 	}
 }
 
@@ -127,8 +131,10 @@ func (scw *JobConfig) Run(job *que.Job) error {
 
 // This job manages the tx, no one else should commit or rollback
 func (scw *JobConfig) tryRun(job *que.Job) error {
-	scw.logger.Printf("START %s%s (%d)\n", job.Type, job.Args, job.ID)
-	defer scw.logger.Printf("STOP %s%s (%d)\n", job.Type, job.Args, job.ID)
+	if scw.VerboseLogging {
+		scw.logger.Printf("START %s%s (%d)\n", job.Type, job.Args, job.ID)
+		defer scw.logger.Printf("STOP %s%s (%d)\n", job.Type, job.Args, job.ID)
+	}
 
 	tx, err := job.Conn().Begin()
 	if err != nil {
