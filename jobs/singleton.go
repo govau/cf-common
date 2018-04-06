@@ -11,7 +11,7 @@ import (
 
 var (
 	ErrImmediateReschedule = errors.New("commit tx, and reschedule ASAP")
-	ErrDidNotReschedule    = errors.New("no need to reschedule, we are done")
+	ErrDoNotReschedule     = errors.New("no need to reschedule, we are done")
 )
 
 // JobFunc should do a thing. Return either:
@@ -115,7 +115,7 @@ func (scw *JobConfig) Run(job *que.Job) error {
 		case ErrImmediateReschedule:
 			scw.logger.Printf("RESCHEDULE REQUESTED, RESTARTING... %s%s (%d)", job.Type, job.Args, job.ID)
 			continue
-		case ErrDidNotReschedule:
+		case ErrDoNotReschedule:
 			scw.logger.Printf("CRON JOB FINISHED AND HAS REQUESTED NOT TO BE RESCHEDULED %s%s (%d)", job.Type, job.Args, job.ID)
 			return nil
 		default:

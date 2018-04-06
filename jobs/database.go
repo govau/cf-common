@@ -111,6 +111,7 @@ type Handler struct {
 	WorkerMap     map[string]*JobConfig
 	OnStart       func(qc *que.Client, pgxPool *pgx.ConnPool, logger *log.Logger) error
 	Logger        *log.Logger
+	QueueName     string
 }
 
 func (h *Handler) WorkForever() error {
@@ -160,6 +161,7 @@ func (h *Handler) WorkForever() error {
 	}
 
 	workers := que.NewWorkerPool(qc, workerMap, h.WorkerCount)
+	workers.Queue = h.QueueName
 
 	// Prepare a shutdown function
 	shutdown := func() {
