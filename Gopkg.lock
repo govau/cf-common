@@ -5,7 +5,7 @@
   branch = "fixshutdown"
   name = "github.com/bgentry/que-go"
   packages = ["."]
-  revision = "decd7cabcfb7e5ae1a547cf0257b2fc63e634331"
+  revision = "9937fbb63d3e5c2cd14d30378eaee59641fc4fbe"
   source = "github.com/govau/que-go"
 
 [[projects]]
