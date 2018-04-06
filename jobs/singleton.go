@@ -113,13 +113,13 @@ func (scw *JobConfig) Run(job *que.Job) error {
 		case nil:
 			return nil
 		case ErrImmediateReschedule:
-			scw.logger.Printf("RESCHEDULE REQUESTED, RESTARTING... %s%s (%d)", job.Type, job.Args, job.ID)
+			scw.logger.Printf("RESCHEDULE REQUESTED, RESTARTING... %s%s (%d)\n", job.Type, job.Args, job.ID)
 			continue
 		case ErrDoNotReschedule:
-			scw.logger.Printf("CRON JOB FINISHED AND HAS REQUESTED NOT TO BE RESCHEDULED %s%s (%d)", job.Type, job.Args, job.ID)
+			scw.logger.Printf("CRON JOB FINISHED AND HAS REQUESTED NOT TO BE RESCHEDULED %s%s (%d)\n", job.Type, job.Args, job.ID)
 			return nil
 		default:
-			scw.logger.Printf("FAILED WITH ERROR, RELY ON QUE TO RESCHEDULE %s%s (%d): %s", job.Type, job.Args, job.ID, err)
+			scw.logger.Printf("FAILED WITH ERROR, RELY ON QUE TO RESCHEDULE %s%s (%d): %s\n", job.Type, job.Args, job.ID, err)
 			return err
 		}
 	}
@@ -127,8 +127,8 @@ func (scw *JobConfig) Run(job *que.Job) error {
 
 // This job manages the tx, no one else should commit or rollback
 func (scw *JobConfig) tryRun(job *que.Job) error {
-	scw.logger.Printf("START %s%s (%d)", job.Type, job.Args, job.ID)
-	defer scw.logger.Printf("STOP %s%s (%d)", job.Type, job.Args, job.ID)
+	scw.logger.Printf("START %s%s (%d)\n", job.Type, job.Args, job.ID)
+	defer scw.logger.Printf("STOP %s%s (%d)\n", job.Type, job.Args, job.ID)
 
 	tx, err := job.Conn().Begin()
 	if err != nil {
