@@ -192,5 +192,7 @@ func (h *Handler) WorkForever() error {
 	}
 
 	workers.Start()
-	return nil
+
+	// Wait forever
+	select {}
 }
