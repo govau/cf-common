@@ -41,7 +41,7 @@ func (v *VarSet) AppendSource(s Lookup) *VarSet {
 // String gets the string environment variable with the given name, if set.
 // If not found, returns defaultVal.
 func (v *VarSet) String(name, defaultVal string) string {
-	rv, ok := v.load(name)
+	rv, ok := v.Lookup(name)
 	if !ok {
 		return defaultVal
 	}
@@ -53,7 +53,7 @@ func (v *VarSet) String(name, defaultVal string) string {
 // If desired, callers can use IsVarNotFound when recovering from the panic in
 // order to check type of the error.
 func (v *VarSet) MustString(name string) string {
-	rv, ok := v.load(name)
+	rv, ok := v.Lookup(name)
 	if !ok {
 		panic(&varNotFoundError{name: name})
 	}
@@ -64,7 +64,7 @@ func (v *VarSet) MustString(name string) string {
 // If not found, returns false.
 // If found and cannot parse, returns an error.
 func (v *VarSet) Bool(name string) (bool, error) {
-	val, ok := v.load(name)
+	val, ok := v.Lookup(name)
 	if !ok {
 		return false, nil
 	}
@@ -82,7 +82,7 @@ func (v *VarSet) Bool(name string) (bool, error) {
 // If desired, callers can use IsVarNotParsable when recovering from the panic
 // in order to check type of the error.
 func (v *VarSet) MustBool(name string) bool {
-	val, ok := v.load(name)
+	val, ok := v.Lookup(name)
 	if !ok {
 		return false
 	}
@@ -100,7 +100,7 @@ func (v *VarSet) MustBool(name string) bool {
 // If desired, callers can use IsVarNotFound and IsVarNotParsable when
 // recovering from the panic in order to check type of the error.
 func (v *VarSet) MustHexEncodedByteArray(name string, decodedByteLength int) []byte {
-	rv, ok := v.load(name)
+	rv, ok := v.Lookup(name)
 	if !ok {
 		panic(&varNotFoundError{name: name})
 	}
@@ -114,9 +114,9 @@ func (v *VarSet) MustHexEncodedByteArray(name string, decodedByteLength int) []b
 	return byteRv
 }
 
-// load looks for a given name within all lookup sources.
+// Lookup looks for a given name within all lookup sources in order.
 // If no variable is found, an empty string and false is returned.
-func (v *VarSet) load(name string) (string, bool) {
+func (v *VarSet) Lookup(name string) (string, bool) {
 	for _, lookup := range v.sources {
 		rv, ok := lookup(name)
 		if ok {
