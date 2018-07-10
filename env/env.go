@@ -126,6 +126,13 @@ func (v *VarSet) Lookup(name string) (string, bool) {
 	return "", false
 }
 
+// IsSet looks for a given name within all lookup sources in order.
+// If found, true is returned, else false.
+func (v *VarSet) IsSet(name string) bool {
+	_, ok := v.Lookup(name)
+	return ok
+}
+
 // IsVarNotFound returns a boolean indicating whether the error is known to
 // report that an environment variable is not found.
 func IsVarNotFound(err error) bool {
