@@ -10,9 +10,11 @@ import (
 // and whether or not it was found.
 type Lookup func(name string) (string, bool)
 
-// passthruLookup always returns false for the environment variable with the
-// given name.
-func passthruLookup(name string) (string, bool) {
+// NoopLookup always returns false for the environment variable with the
+// given name. Useful as a fallback to return for an env lookup that may
+// not always be applicable, e.g. if not running in CloudFoundry, a user
+// provided service lookup won't be applicable.
+func NoopLookup(name string) (string, bool) {
 	return "", false
 }
 
