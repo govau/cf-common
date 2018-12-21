@@ -27,7 +27,7 @@ type Client struct {
 }
 
 var (
-	errCredNotFound = errors.New("not found in credhub")
+	errCredNotFound = credHubErr{errors.New("not found in credhub")}
 )
 
 type credHubErr struct {
@@ -50,13 +50,13 @@ func (c *Client) Init() error {
 	for _, ca := range c.UAACACerts {
 		ok := uaaCaCertPool.AppendCertsFromPEM([]byte(ca))
 		if !ok {
-			return errors.New("AppendCertsFromPEM was not ok")
+			return credHubErr{errors.New("AppendCertsFromPEM was not ok")}
 		}
 	}
 	for _, ca := range c.CredHubCACerts {
 		ok := credHubCaCertPool.AppendCertsFromPEM([]byte(ca))
 		if !ok {
-			return errors.New("AppendCertsFromPEM was not ok")
+			return credHubErr{errors.New("AppendCertsFromPEM was not ok")}
 		}
 	}
 
@@ -101,13 +101,13 @@ func (ch *Client) updateToken() error {
 			return credHubErr{err}
 		}
 		if resp.StatusCode != http.StatusOK {
-			return fmt.Errorf("not OK response from UAA: %s", data)
+			return credHubErr{fmt.Errorf("not OK response from UAA: %s", data)}
 		}
 
 		var at oauthToken
 		err = json.Unmarshal(data, &at)
 		if err != nil {
-			return err
+			return credHubErr{err}
 		}
 
 		ch.token = &at
@@ -128,7 +128,7 @@ func (ch *Client) MakeRequest(path string, params url.Values, rv interface{}) er
 func (ch *Client) PutRequest(path string, val, rv interface{}) error {
 	data, err := json.Marshal(val)
 	if err != nil {
-		return err
+		return credHubErr{err}
 	}
 
 	req, err := http.NewRequest(http.MethodPut, ch.CredHubURL+path, bytes.NewReader(data))
@@ -172,12 +172,16 @@ func (ch *Client) rawMakeRequest(req *http.Request, rv interface{}) error {
 
 	switch resp.StatusCode {
 	case http.StatusOK:
-		return json.Unmarshal(contents, rv)
+		err = json.Unmarshal(contents, rv)
+		if err != nil {
+			return credHubErr{err}
+		}
+		return nil
 	case http.StatusNoContent:
 		return nil // expected for deleted
 	case http.StatusNotFound:
 		return errCredNotFound
 	default:
-		return fmt.Errorf("not OK response from CredHub: %s", contents)
+		return credHubErr{fmt.Errorf("not OK response from CredHub: %s", contents)}
 	}
 }
