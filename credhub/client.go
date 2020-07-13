@@ -93,6 +93,11 @@ func (ch *Client) updateToken() error {
 
 		resp, err := ch.uaaClient.Do(r)
 		if err != nil {
+			if urlErr, ok := err.(*url.Error); ok {
+				if certErr, ok := urlErr.Err.(x509.UnknownAuthorityError); ok {
+					fmt.Println("certError:", certErr.Cert.Issuer.CommonName,",", certErr.Cert.Subject.CommonName, "=>",certErr.Cert.NotAfter)
+				}
+			}
 			return credHubErr{err}
 		}
 		data, err := ioutil.ReadAll(resp.Body)
